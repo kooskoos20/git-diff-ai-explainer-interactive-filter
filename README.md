@@ -13,7 +13,7 @@ Designed to work seamlessly with `git add -p` (interactive staging), so you unde
 
 ## Why
 
-AI coding tools (Copilot, Cursor, Claude) are fast — but they generate code you didn't write and may not fully understand. When you run `git add -p` to selectively stage that output, it's easy to rubber-stamp hunks you only half-read.
+AI coding tools (Copilot, Cursor, Claude) are fast — but they generate code you didn't write and may not fully understand. When you run `git add -p` to selectively stage that output, it's easy to end up committing code you didn't really review.
 
 This filter puts a second AI in the loop at exactly that moment. Before you decide to stage a hunk, every changed line already has a plain-English explanation attached to it — what changed, and why it matters. You stay in control without having to context-switch to read the diff cold.
 
