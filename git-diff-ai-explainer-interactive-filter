@@ -1,0 +1,70 @@
+#!/bin/bash
+# A Git interactive diff filter that annotates lines using Claude
+
+# 1. Read the diff file provided by Git via standard input
+DIFF_INPUT=$(cat)
+
+if [ -z "$DIFF_INPUT" ]; then
+  exit 0
+fi
+
+# 2. Strip ANSI colors so Claude can read the raw text cleanly
+DIFF_PLAIN=$(echo "$DIFF_INPUT" | perl -pe 's/\x1b\[[0-9;]*[mGKF]//g')
+
+# 3. Add line numbers
+DIFF_NUMBERED=$(echo "$DIFF_PLAIN" | awk '{print NR ":" $0}')
+
+# 4. Build prompt
+CLAUDE_PROMPT=$(cat << EOF
+Analyze this Git diff.
+For any line that contains a significant code change (+ or -), provide a VERY SHORT, one-sentence explanation of what changed and why.
+
+Output format MUST be EXACTLY this, with one explanation per line:
+LINE_NUMBER:::Your short explanation
+
+Do not provide explanations for unchanged lines.
+Please output strict plain text.
+
+DIFF:
+$DIFF_NUMBERED
+EOF
+)
+
+# 5. Call Claude CLI
+CLAUDE_OUT=$(echo "$CLAUDE_PROMPT" | claude --model haiku)
+
+# Fallback in case of an API error
+if [ -z "$CLAUDE_OUT" ]; then
+  echo "$DIFF_INPUT"
+  exit 0
+fi
+
+# 6. Weave them together IN-PLACE (Appending to the line)
+TMP_IN=$(mktemp)
+TMP_OUT=$(mktemp)
+
+echo "$DIFF_INPUT" > "$TMP_IN"
+echo "$CLAUDE_OUT" > "$TMP_OUT"
+
+awk -F ":::" '
+  # Read Claude output
+  NR == FNR {
+    if ($1 ~ /^[0-9]+$/ && $2 != "") {
+      gsub(/^[ \t]+|[ \t]+$/, "", $2)
+      comments[$1] = $2
+    }
+    next
+  }
+  # Read original Diff stream
+  {
+    if (FNR in comments) {
+      # Append the comment inline to avoid breaking Git line counts
+      printf "%s\033[36m   <-- 🤖 %s\033[0m\n", $0, comments[FNR]
+    } else {
+      print $0
+    }
+  }
+' "$TMP_OUT" "$TMP_IN"
+
+# Cleanup
+rm -f "$TMP_IN" "$TMP_OUT"
