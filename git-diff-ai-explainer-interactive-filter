@@ -8,6 +8,11 @@ if [ -z "$DIFF_INPUT" ]; then
   exit 0
 fi
 
+if [ "${GIT_DIFF_NO_AI:-0}" = "1" ]; then
+  echo "$DIFF_INPUT"
+  exit 0
+fi
+
 # 2. Strip ANSI colors so Claude can read the raw text cleanly
 DIFF_PLAIN=$(echo "$DIFF_INPUT" | perl -pe 's/\x1b\[[0-9;]*[mGKF]//g')
 
